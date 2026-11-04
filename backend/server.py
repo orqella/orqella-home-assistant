@@ -595,6 +595,7 @@ def proxy_example() -> str:
         f'base_url = "{HA_URL}"\n'
         'host = "homeassistant.orqella.localhost"\n'
         "websocket = true\n"
+        "frame = true\n"
     )
 
 

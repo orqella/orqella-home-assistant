@@ -16,6 +16,7 @@ title = "Home Assistant"
 base_url = "http://127.0.0.1:8123"
 host = "homeassistant.orqella.localhost"
 websocket = true
+frame = true
 ```
 
 For Home Assistant on another machine, change `base_url` to that host and make
