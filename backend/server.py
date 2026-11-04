@@ -515,19 +515,29 @@ def ensure_integration() -> dict:
                 (item for item in entries if item.get("domain") == "jarvis"), None
             ) if isinstance(entries, list) else None
             if not entry:
-                flow = ws.command("config_entries/flow", handler="jarvis")
+                _status, flow = request_json(
+                    f"{HA_URL}/api/config/config_entries/flow",
+                    token,
+                    "POST",
+                    {"handler": "jarvis", "show_advanced_options": False},
+                )
                 if not isinstance(flow, dict) or not flow.get("flow_id"):
                     raise RuntimeError("Home Assistant did not start the Jarvis config flow")
-                submitted = ws.command(
-                    f"config_entries/flow/{flow['flow_id']}",
-                    user_input={
-                        "url": VOICE_URL,
-                        "token": voice_token,
-                    },
+                _status, submitted = request_json(
+                    f"{HA_URL}/api/config/config_entries/flow/{flow['flow_id']}",
+                    token,
+                    "POST",
+                    {"user_input": {"url": VOICE_URL, "token": voice_token}},
                 )
-                if not isinstance(submitted, dict) or submitted.get("type") != "create_entry":
-                    raise RuntimeError("Home Assistant did not create the Jarvis integration entry")
-                entries = ws.command("config_entries/get", domain="jarvis")
+                if not isinstance(submitted, dict):
+                    raise RuntimeError("Home Assistant returned an invalid config flow response")
+                if submitted.get("type") == "abort" and submitted.get("reason") == "already_configured":
+                    entries = ws.command("config_entries/get", domain="jarvis")
+                elif submitted.get("type") != "create_entry":
+                    reason = submitted.get("reason") or submitted.get("errors") or ""
+                    raise RuntimeError(f"Home Assistant did not create the Jarvis integration entry: {reason}")
+                else:
+                    entries = ws.command("config_entries/get", domain="jarvis")
                 entry = next(
                     (item for item in entries if item.get("domain") == "jarvis"), None
                 ) if isinstance(entries, list) else None
