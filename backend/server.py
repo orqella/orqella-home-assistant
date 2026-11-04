@@ -690,6 +690,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("token kind must be ha or voice")
                 token = str(payload.get("token") or "").strip()
                 write_token(kind, token)
+                with INTEGRATION_LOCK:
+                    INTEGRATION_CACHE["at"] = 0.0
+                    INTEGRATION_CACHE["value"] = None
                 return self.send_json(200, {"ok": True, "kind": kind})
             if path == "/api/integration/ensure":
                 return self.send_json(200, ensure_integration())
