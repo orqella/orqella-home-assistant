@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Home Assistant settings</title>
+  <link rel="stylesheet" href="/assets/theme.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <main class="settings">
+    <header class="settings-head">
+      <div>
+        <p class="eyebrow">Home Assistant</p>
+        <h1>Connection & Voice Assistant</h1>
+        <p class="muted" id="summary">Checking Home Assistant…</p>
+      </div>
+      <button class="ghost" id="refresh" type="button">Refresh</button>
+    </header>
+
+    <section class="status-grid" id="statusGrid">
+      <article class="status-card"><span class="status-label">Home Assistant</span><b id="haState">—</b><small id="haDetail">checking</small></article>
+      <article class="status-card"><span class="status-label">Voice Assistant</span><b id="voiceState">—</b><small id="voiceDetail">checking</small></article>
+      <article class="status-card"><span class="status-label">Assist integration</span><b id="integrationState">—</b><small id="integrationDetail">checking</small></article>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><h2>Access tokens</h2><span class="muted" id="tokenSource"></span></div>
+      <p class="hint">A saved token is stored in the module data directory with mode 0600. It is never shown again after saving.</p>
+      <div class="fields">
+        <label class="field-label full">Home Assistant long-lived token<input class="field" id="haToken" type="password" autocomplete="new-password" placeholder="Leave blank to keep the current token"></label>
+        <label class="field-label full">Voice Assistant API token <span class="muted">optional</span><input class="field" id="voiceToken" type="password" autocomplete="new-password" placeholder="Usually blank"></label>
+      </div>
+      <div class="row"><button class="primary" id="saveTokens" type="button">Save tokens</button><button class="ghost" id="clearTokens" type="button">Clear saved tokens</button><span class="muted" id="tokenStatus"></span></div>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><h2>Voice Assistant in Home Assistant</h2><span class="muted" id="componentVersion"></span></div>
+      <p class="hint">Installs the bundled Jarvis custom component, creates a Home Assistant integration entry for the Voice Assistant API, and adds an Assist pipeline using its Whisper STT entity.</p>
+      <div class="row wrap">
+        <button class="primary" id="integrate" type="button">Integrate with Home Assistant</button>
+        <button class="ghost" id="download" type="button">Download custom component</button>
+        <button class="ghost" id="restart" type="button" hidden>Restart Home Assistant</button>
+      </div>
+      <p class="message" id="message" hidden></p>
+      <pre class="log" id="log" hidden></pre>
+    </section>
+
+    <section class="card">
+      <div class="section-head"><h2>Dashboard proxy</h2><span class="muted">core config</span></div>
+      <p class="hint">The module page opens Home Assistant as a separate app origin through the Orqella proxy. Add this mount to <code>config.toml</code> and restart the daemon. Change <code>base_url</code> for a remote Home Assistant.</p>
+      <pre class="snippet" id="proxySnippet">Loading…</pre>
+      <div class="row"><button class="ghost" id="copyProxy" type="button">Copy mount</button><span class="muted" id="proxyStatus"></span></div>
+    </section>
+  </main>
+  <div class="toast" id="toast" hidden></div>
+  <script src="settings.js"></script>
+</body>
+</html>

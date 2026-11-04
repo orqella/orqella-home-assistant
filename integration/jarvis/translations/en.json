@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Jarvis",
+        "description": "Connect Home Assistant Assist to the local Jarvis API.",
+        "data": {
+          "url": "Jarvis API URL",
+          "token": "API token (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to Jarvis. Is `jarvis serve` running?",
+      "invalid_auth": "The Jarvis API token is invalid.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "Jarvis is already configured."
+    }
+  }
+}

@@ -1,0 +1,7 @@
+data/
+.venv/
+node_modules/
+target/
+__pycache__/
+*.pyc
+sidecar.log

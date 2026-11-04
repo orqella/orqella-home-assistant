@@ -1,0 +1,5 @@
+DOMAIN = "jarvis"
+CONF_URL = "url"
+CONF_TOKEN = "token"
+DEFAULT_URL = "http://127.0.0.1:8790"
+DEFAULT_TIMEOUT = 60

@@ -1,0 +1,83 @@
+schema = 1
+id = "home-assistant"
+name = "Home Assistant"
+version = "0.1.0"
+api_version = "1"
+description = "Open your Home Assistant dashboard and connect Voice Assistant to Assist."
+entry = "ui/index.html"
+overview = "ui/overview.html"
+settings = "ui/settings.html"
+overview_default = true
+page_default = true
+icon = "ui/icon.svg"
+node_scope = "node"
+permissions = ["backend", "node.proxy:homeassistant", "app.open"]
+
+[ui]
+surface = "page"
+overview_width = 3
+overview_height = 2
+
+[backend]
+kind = "sidecar"
+command = ["python3", "backend/server.py"]
+health_path = "/health"
+ready_timeout_ms = 15000
+sandbox = false
+platforms = ["linux", "macos", "windows"]
+
+[[config.fields]]
+key = "ha_url"
+type = "text"
+label = "Home Assistant URL"
+default = "http://127.0.0.1:8123"
+help = "REST and WebSocket base URL. Use the LAN/host URL when Home Assistant runs elsewhere."
+
+[[config.fields]]
+key = "ha_token_command"
+type = "text"
+label = "HA token command"
+default = "secret-tool lookup service hass origin http://localhost:8123"
+help = "Command whose first output line is a long-lived HA token. Leave blank to use HA_TOKEN or the token saved in Settings."
+
+[[config.fields]]
+key = "ha_config_dir"
+type = "text"
+label = "HA config directory"
+default = "~/.homeassistant"
+help = "Used to install the bundled Jarvis custom component on a local HA install. Remote HA installs use the downloadable bundle."
+
+[[config.fields]]
+key = "voice_token_command"
+type = "text"
+label = "Voice Assistant token command"
+default = ""
+help = "Optional command whose first output line is the Voice Assistant API token. Usually blank."
+
+[[config.fields]]
+key = "voice_assistant_url"
+type = "text"
+label = "Voice Assistant API URL"
+default = "http://127.0.0.1:8790"
+help = "The Voice Assistant API used by the Home Assistant conversation agent and Whisper STT entity."
+
+[[config.fields]]
+key = "dashboard_path"
+type = "text"
+label = "Dashboard path"
+default = "/lovelace/0"
+help = "Path opened in the Home Assistant app surface. Use /lovelace/<dashboard> or /."
+
+[[config.fields]]
+key = "auto_open"
+type = "boolean"
+label = "Open the dashboard automatically"
+default = true
+help = "Open the Home Assistant app surface as soon as the module page loads."
+
+[[config.fields]]
+key = "pipeline_name"
+type = "text"
+label = "Assist pipeline name"
+default = "Voice Assistant"
+help = "Name used when creating a new Assist pipeline."

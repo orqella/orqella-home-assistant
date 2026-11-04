@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Home Assistant</title>
+  <link rel="stylesheet" href="/assets/theme.css">
+  <link rel="stylesheet" href="overview.css">
+</head>
+<body>
+  <main class="ha-card">
+    <header>
+      <div>
+        <p class="eyebrow">Home Assistant</p>
+        <h1 id="location">Home</h1>
+      </div>
+      <span class="dot" id="dot"></span>
+    </header>
+    <div class="metrics">
+      <div><b id="entities">—</b><small>entities</small></div>
+      <div><b id="version">—</b><small>version</small></div>
+      <div><b id="voice">—</b><small>voice</small></div>
+    </div>
+    <footer><span id="pipeline">Checking Assist…</span><span id="state">connecting</span></footer>
+  </main>
+  <script src="overview.js"></script>
+</body>
+</html>
