@@ -11,7 +11,7 @@
 
   function toast(message, bad = false) {
     $("toast").textContent = message;
-    $("toast").style.borderColor = bad ? "var(--red, #f38ba8)" : "";
+    $("toast").style.borderColor = bad ? "var(--red)" : "";
     $("toast").hidden = false;
     clearTimeout(toast.timer);
     toast.timer = setTimeout(() => { $("toast").hidden = true; }, 3200);

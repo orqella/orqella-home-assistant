@@ -1,17 +1,99 @@
-:root { --ov-bg: var(--panel, #111a20); --ov-line: var(--line, #263740); --ov-ink: var(--ink, #e7f0ee); --ov-muted: var(--muted, #8b9ba3); --ov-accent: var(--mint, #7bd7b6); }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; color: var(--ov-ink); font: 12px/1.45 system-ui, sans-serif; }
-.ha-card { height: 100%; padding: 12px 13px 10px; display: flex; flex-direction: column; gap: 8px; border-radius: inherit; background: var(--ov-bg); }
-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.eyebrow { margin: 0 0 1px; color: var(--ov-accent); font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
-h1 { margin: 0; font-size: 15px; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ov-muted); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ov-muted) 14%, transparent); }
-.dot.online { background: var(--ov-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ov-accent) 16%, transparent); }
-.dot.bad { background: var(--red, #f38ba8); box-shadow: 0 0 0 4px color-mix(in srgb, var(--red, #f38ba8) 16%, transparent); }
-.metrics { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; align-content: center; }
-.metrics div { min-width: 0; padding: 7px 6px; border-radius: 8px; background: color-mix(in srgb, var(--ov-bg) 55%, var(--ov-line)); }
-.metrics b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.metrics small { display: block; color: var(--ov-muted); font-size: 9px; }
-footer { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid color-mix(in srgb, var(--ov-line) 65%, transparent); padding-top: 6px; color: var(--ov-muted); font-size: 10px; }
-footer span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.muted { color: var(--ov-muted); }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  color: var(--ink);
+  font: 12px/1.45 var(--font-sans);
+}
+
+.ha-card {
+  height: 100%;
+  padding: 12px 13px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: inherit;
+  background: var(--panel);
+}
+header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.eyebrow {
+  margin: 0 0 1px;
+  color: var(--mint);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--muted) 14%, transparent);
+}
+.dot.online {
+  background: var(--green);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 16%, transparent);
+}
+.dot.bad {
+  background: var(--red);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--red) 16%, transparent);
+}
+
+.metrics {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  align-content: center;
+}
+.metrics div {
+  min-width: 0;
+  padding: 7px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 55%, var(--line));
+}
+.metrics b {
+  display: block;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.metrics small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  padding-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+footer span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.muted { color: var(--muted); }
