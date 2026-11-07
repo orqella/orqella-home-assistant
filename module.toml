@@ -1,7 +1,7 @@
 schema = 1
 id = "home-assistant"
 name = "Home Assistant"
-version = "0.1.3"
+version = "0.1.4"
 api_version = "1"
 description = "Open your Home Assistant dashboard and connect Voice Assistant to Assist."
 entry = "ui/index.html"
@@ -12,6 +12,11 @@ page_default = true
 icon = "ui/icon.svg"
 node_scope = "node"
 permissions = ["backend", "node.proxy:homeassistant", "app.open"]
+
+[[dependencies]]
+id = "voice-assistant"
+optional = true
+reason = "Adds the Voice Assistant conversation agent and Whisper STT pipeline."
 
 [ui]
 surface = "page"

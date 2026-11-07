@@ -43,6 +43,10 @@ from:
 
 For remote Home Assistant, save a long-lived token in Settings.
 
+Optional dependency: **Voice Assistant**. Installing it adds the Assist
+conversation agent and Whisper STT pipeline; the Home Assistant dashboard and
+proxy work without it.
+
 ## Voice Assistant integration
 
 The module bundles the Jarvis custom component under `integration/jarvis`.
