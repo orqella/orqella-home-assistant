@@ -393,6 +393,7 @@ def component_state() -> dict:
         "version": version,
         "source_version": source_version,
         "current": bool(installed and source_version and version == source_version),
+        "error": "",
     }
 
 
