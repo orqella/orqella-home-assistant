@@ -37,7 +37,11 @@ DATA_DIR = MODULE_ROOT / "data"
 INTEGRATION_SOURCE = MODULE_ROOT / "integration" / "jarvis"
 HA_URL = str(CONFIG.get("ha_url") or "http://127.0.0.1:8123").rstrip("/")
 VOICE_URL = str(CONFIG.get("voice_assistant_url") or "http://127.0.0.1:8790").rstrip("/")
-HA_CONFIG_DIR = Path(os.path.expanduser(str(CONFIG.get("ha_config_dir") or "~/.homeassistant")))
+HA_CONFIG_DIR = (
+    Path(os.path.expanduser(str(CONFIG.get("ha_config_dir"))))
+    if str(CONFIG.get("ha_config_dir") or "").strip()
+    else None
+)
 DASHBOARD_PATH = str(CONFIG.get("dashboard_path") or "/lovelace/0")
 PIPELINE_NAME = str(CONFIG.get("pipeline_name") or "Voice Assistant")
 AUTO_OPEN = bool(CONFIG.get("auto_open", True))
@@ -348,6 +352,17 @@ class HAWebSocket:
 
 
 def component_state() -> dict:
+    if HA_CONFIG_DIR is None:
+        return {
+            "installed": False,
+            "writable": False,
+            "path": "",
+            "config_dir": "",
+            "version": "",
+            "source_version": "",
+            "current": False,
+            "error": "Set a local HA config directory or download the component bundle.",
+        }
     destination = HA_CONFIG_DIR / "custom_components" / "jarvis"
     manifest = destination / "manifest.json"
     source_manifest = INTEGRATION_SOURCE / "manifest.json"
@@ -382,6 +397,10 @@ def component_state() -> dict:
 
 
 def install_component() -> dict:
+    if HA_CONFIG_DIR is None:
+        raise RuntimeError(
+            "Set the Home Assistant config directory or download the component bundle."
+        )
     state = component_state()
     if state["installed"] and state["current"]:
         return state
@@ -619,7 +638,7 @@ def status_payload() -> dict:
             "dashboard_path": DASHBOARD_PATH,
             "auto_open": AUTO_OPEN,
             "pipeline_name": PIPELINE_NAME,
-            "ha_config_dir": str(HA_CONFIG_DIR),
+            "ha_config_dir": str(HA_CONFIG_DIR or ""),
         },
         "proxy_example": proxy_example(),
     }

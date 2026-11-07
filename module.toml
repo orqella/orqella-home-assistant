@@ -1,7 +1,7 @@
 schema = 1
 id = "home-assistant"
 name = "Home Assistant"
-version = "0.1.1"
+version = "0.1.2"
 api_version = "1"
 description = "Open your Home Assistant dashboard and connect Voice Assistant to Assist."
 entry = "ui/index.html"
@@ -25,6 +25,7 @@ health_path = "/health"
 ready_timeout_ms = 15000
 sandbox = false
 platforms = ["linux", "macos", "windows"]
+python = ">=3.10"
 
 [[config.fields]]
 key = "ha_url"
@@ -37,15 +38,15 @@ help = "REST and WebSocket base URL. Use the LAN/host URL when Home Assistant ru
 key = "ha_token_command"
 type = "text"
 label = "HA token command"
-default = "secret-tool lookup service hass origin http://localhost:8123"
-help = "Command whose first output line is a long-lived HA token. Leave blank to use HA_TOKEN or the token saved in Settings."
+default = ""
+help = "Optional command whose first output line is a long-lived HA token. Leave blank to use HA_TOKEN or the token saved in Settings."
 
 [[config.fields]]
 key = "ha_config_dir"
 type = "text"
 label = "HA config directory"
-default = "~/.homeassistant"
-help = "Used to install the bundled Jarvis custom component on a local HA install. Remote HA installs use the downloadable bundle."
+default = ""
+help = "Optional local Home Assistant config directory. Used to install the bundled Jarvis component in place; remote HA installs use the downloadable bundle."
 
 [[config.fields]]
 key = "voice_token_command"

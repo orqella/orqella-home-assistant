@@ -38,7 +38,7 @@ It works with a local container or a remote Home Assistant. Tokens can come
 from:
 
 1. a token saved in Settings (module `data/ha.token`, mode `0600`);
-2. the configured token command, default `secret-tool lookup service hass origin http://localhost:8123`;
+2. the configured token command, if any (blank by default; Linux users can point it at `secret-tool`, macOS users at `security find-generic-password`, and Windows users can leave it blank and save a token in Settings);
 3. `HA_TOKEN` in the daemon environment.
 
 For remote Home Assistant, save a long-lived token in Settings.
@@ -50,7 +50,8 @@ The module bundles the Jarvis custom component under `integration/jarvis`.
 The **Integrate with Home Assistant** button:
 
 1. installs the component into `<ha_config_dir>/custom_components/jarvis` when
-   that directory is writable;
+   a local config directory is configured and writable; otherwise use the
+   downloadable bundle;
 2. creates a `jarvis` config entry pointing at the Voice Assistant API;
 3. creates an Assist pipeline using the `stt.jarvis_whisper` entity if one does
    not exist.
