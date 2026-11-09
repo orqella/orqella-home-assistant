@@ -12,7 +12,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 4px 2px 12px;
+  padding: 18px;
 }
 .settings-head {
   display: flex;
