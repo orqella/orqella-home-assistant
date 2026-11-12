@@ -7,6 +7,7 @@ import tempfile
 import threading
 import unittest
 import zipfile
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
 from pathlib import Path
@@ -199,6 +200,133 @@ class HomeAssistantBackendTests(unittest.TestCase):
 
 def stat_mode(path: Path) -> int:
     return os.stat(path).st_mode & 0o777
+
+
+class HomeAssistantEdgeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.old_config_dir = server.HA_CONFIG_DIR
+        self.old_data = server.DATA_DIR
+        self.old_config = dict(server.CONFIG)
+        server.HA_CONFIG_DIR = None
+        server.DATA_DIR = self.root / "data"
+        server.DATA_DIR.mkdir(parents=True)
+        server.INTEGRATION_CACHE["at"] = 0.0
+        server.INTEGRATION_CACHE["value"] = None
+
+    def tearDown(self) -> None:
+        server.HA_CONFIG_DIR = self.old_config_dir
+        server.DATA_DIR = self.old_data
+        server.CONFIG.clear()
+        server.CONFIG.update(self.old_config)
+        self.temp.cleanup()
+
+    def test_component_state_requires_a_config_directory(self) -> None:
+        state = server.component_state()
+        self.assertFalse(state["installed"])
+        self.assertFalse(state["writable"])
+        self.assertIn("config directory", state["error"])
+        with self.assertRaises(RuntimeError):
+            server.install_component()
+
+    def test_token_precedence_and_commands(self) -> None:
+        server.CONFIG["ha_token_command"] = ""
+        os.environ.pop("HA_TOKEN", None)
+        self.assertEqual(server.token_for("ha"), ("", ""))
+
+        with mock.patch.dict(os.environ, {"HA_TOKEN": "env-token"}):
+            self.assertEqual(server.token_for("ha"), ("env-token", "environment"))
+
+        server.CONFIG["ha_token_command"] = "printf 'command-token\\n'"
+        self.assertEqual(server.token_for("ha"), ("command-token", "command"))
+
+        server.write_token("ha", "saved-token")
+        self.assertEqual(server.token_for("ha"), ("saved-token", "settings"))
+
+        server.CONFIG["ha_token_command"] = "sh -c 'exit 1'"
+        server.write_token("ha", "")
+        with mock.patch.dict(os.environ, {"HA_TOKEN": "env-token"}):
+            self.assertEqual(server.token_for("ha"), ("env-token", "environment"))
+
+    def test_integration_cache_can_be_bypassed(self) -> None:
+        calls = []
+
+        def fake_read():
+            calls.append(True)
+            return {"entry": None, "pipeline": None, "error": ""}
+
+        with mock.patch.object(server, "read_integration", side_effect=fake_read):
+            first = server.integration_status()
+            second = server.integration_status()
+            forced = server.integration_status(True)
+        self.assertEqual(first, second)
+        self.assertEqual(forced, first)
+        self.assertEqual(len(calls), 2)
+
+    def test_ensure_integration_reports_manual_install_when_unwritable(self) -> None:
+        with (
+            mock.patch.object(server, "ha_status", return_value={"connected": True, "error": ""}),
+            mock.patch.object(
+                server,
+                "component_state",
+                return_value={
+                    "installed": False,
+                    "current": False,
+                    "writable": False,
+                    "error": "",
+                },
+            ),
+            mock.patch.object(
+                server, "integration_status", return_value={"entry": None, "pipeline": None, "error": ""}
+            ),
+        ):
+            result = server.ensure_integration()
+        self.assertFalse(result["ok"])
+        self.assertTrue(result["needs_manual_install"])
+        self.assertIn("not writable", result["error"])
+
+    def test_restart_requires_a_token_and_uses_the_websocket(self) -> None:
+        server.CONFIG["ha_token_command"] = ""
+        server.CONFIG["ha_token_command"] = "printf 'token\\n'"
+        events = []
+
+        class FakeWebSocket:
+            ha_version = "2026.11.0"
+
+            def __init__(self, url, token):
+                events.append(("connect", url, token))
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def command(self, command, **payload):
+                events.append(("command", command, payload))
+
+        old = server.HAWebSocket
+        server.HAWebSocket = FakeWebSocket
+        try:
+            result = server.restart_ha()
+        finally:
+            server.HAWebSocket = old
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["ha_version"], "2026.11.0")
+        self.assertIn(("command", "homeassistant/restart", {}), events)
+
+    def test_status_payload_includes_config_and_proxy_example(self) -> None:
+        with (
+            mock.patch.object(server, "ha_status", return_value={"connected": False}),
+            mock.patch.object(server, "voice_status", return_value={"reachable": False}),
+            mock.patch.object(server, "integration_status", return_value={"entry": None}),
+        ):
+            payload = server.status_payload()
+        self.assertFalse(payload["ha"]["connected"])
+        self.assertIn("proxy_mount", payload["config"])
+        self.assertIn('id = "homeassistant"', payload["proxy_example"])
+        self.assertIn("websocket = true", payload["proxy_example"])
 
 
 if __name__ == "__main__":
