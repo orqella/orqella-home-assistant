@@ -1,13 +1,12 @@
 # Home Assistant
 
-Opens your Home Assistant dashboard as an Orqella app surface and integrates the
+Opens your Home Assistant dashboard as an Orqella app surface and optionally integrates the
 Voice Assistant module as a Home Assistant Assist conversation agent and Whisper
 STT engine.
 
 ## Dashboard
 
-Home Assistant runs on its own origin through the Orqella proxy, exactly like the
-OpenCode module. Add a mount to `config.toml`:
+Home Assistant runs on its own origin through the Orqella proxy. Add a mount to `config.toml`:
 
 ```toml
 [[proxy]]

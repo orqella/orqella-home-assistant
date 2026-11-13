@@ -10,5 +10,5 @@ the generic proxy mount, app surface, and module backend/WebSocket bridge.
   mode `0600`.
 - The dashboard is a proxied app surface, not an embedded iframe. It requires a
   configured `[[proxy]]` mount.
-- Keep the Jarvis integration compatible with the Voice Assistant module's
+- Keep the Voice Assistant integration compatible with the Voice Assistant module's
   `/api/conversation` and `/api/stt` endpoints.
