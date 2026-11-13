@@ -71,12 +71,12 @@ The integration uses the same API paths as the Voice Assistant engine:
 ## Install
 
 ```bash
-orqella module install ~/Projects/orqella/modules/home-assistant
+orqella module install https://github.com/orqella/orqella-home-assistant
 ```
 
 Then configure the proxy mount, restart the daemon, and open **Home Assistant**
-from the sidebar. Settings → Home Assistant has the connection, tokens, proxy
-snippet, and integration button.
+from the sidebar. **Settings → Modules**, select **Home Assistant**, to reach the connection,
+tokens, proxy snippet, and integration button.
 
 ## Security
 
