@@ -10,6 +10,7 @@ agent and Whisper STT engine.
 from __future__ import annotations
 
 import base64
+import hmac
 import io
 import json
 import os
@@ -37,6 +38,7 @@ DATA_DIR = MODULE_ROOT / "data"
 INTEGRATION_SOURCE = MODULE_ROOT / "integration" / "jarvis"
 HA_URL = str(CONFIG.get("ha_url") or "http://127.0.0.1:8123").rstrip("/")
 VOICE_URL = str(CONFIG.get("voice_assistant_url") or "http://127.0.0.1:8790").rstrip("/")
+SHARED_VOICE_TOKEN = MODULE_ROOT.parent.parent / "voice-engine.token"
 HA_CONFIG_DIR = (
     Path(os.path.expanduser(str(CONFIG.get("ha_config_dir"))))
     if str(CONFIG.get("ha_config_dir") or "").strip()
@@ -65,17 +67,45 @@ def token_path(kind: str) -> Path:
     return DATA_DIR / f"{kind}.token"
 
 
+def host_path(kind: str) -> Path:
+    return DATA_DIR / f"{kind}.host"
+
+
+def write_host(kind: str, value: str) -> None:
+    path = host_path(kind)
+    if not value:
+        path.unlink(missing_ok=True)
+        return
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    path.write_text(value.strip() + "\n", encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+
+
+def credential_url(kind: str) -> str:
+    return HA_URL if kind == "ha" else VOICE_URL
+
+
+def credential_host(kind: str) -> str:
+    parsed = urlparse(credential_url(kind))
+    return parsed.netloc.lower()
+
+
 def write_token(kind: str, value: str) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     path = token_path(kind)
     if not value:
         path.unlink(missing_ok=True)
+        write_host(kind, "")
         return
     path.write_text(value.strip() + "\n", encoding="utf-8")
     try:
         path.chmod(0o600)
     except OSError:
         pass
+    write_host(kind, credential_host(kind))
 
 
 def token_for(kind: str) -> tuple[str, str]:
@@ -84,9 +114,28 @@ def token_for(kind: str) -> tuple[str, str]:
     try:
         saved = path.read_text(encoding="utf-8").strip()
         if saved:
+            current = credential_host(kind)
+            try:
+                bound = host_path(kind).read_text(encoding="utf-8").strip().lower()
+            except OSError:
+                bound = ""
+            if not bound:
+                # Migrate a pre-binding token: trust the host it was first used
+                # with, then require a re-save if it changes.
+                write_host(kind, current)
+                bound = current
+            if bound != current:
+                return "", "host-mismatch"
             return saved, "settings"
     except OSError:
         pass
+    if kind == "voice":
+        try:
+            shared = SHARED_VOICE_TOKEN.read_text(encoding="utf-8").strip()
+            if shared:
+                return shared, "shared"
+        except OSError:
+            pass
     command = str(CONFIG.get(f"{kind}_token_command") or "").strip()
     if command:
         try:
@@ -660,7 +709,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def authorized(self) -> bool:
-        if not TOKEN or self.headers.get("X-Orqella-Module-Token") == TOKEN:
+        supplied = self.headers.get("X-Orqella-Module-Token") or ""
+        if TOKEN and hmac.compare_digest(supplied, TOKEN):
             return True
         self.send_json(401, {"error": "unauthorized"})
         return False
