@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sys
 import tempfile
 import threading
@@ -24,9 +25,15 @@ class HomeAssistantBackendTests(unittest.TestCase):
         self.old_data = server.DATA_DIR
         self.old_ha_url = server.HA_URL
         self.old_voice_url = server.VOICE_URL
+        self.old_host_home = server.HOST_HOME
         server.HA_CONFIG_DIR = self.root / "config"
         server.DATA_DIR = self.root / "data"
         server.DATA_DIR.mkdir(parents=True)
+        server.STATUS_CACHE["at"] = 0.0
+        server.STATUS_CACHE["value"] = None
+        server.INTEGRATION_CACHE["at"] = 0.0
+        server.INTEGRATION_CACHE["value"] = None
+        server.HOST_HOME = self.root / "home"
         self.http = None
 
     def tearDown(self) -> None:
@@ -37,6 +44,7 @@ class HomeAssistantBackendTests(unittest.TestCase):
         server.DATA_DIR = self.old_data
         server.HA_URL = self.old_ha_url
         server.VOICE_URL = self.old_voice_url
+        server.HOST_HOME = self.old_host_home
         self.temp.cleanup()
 
     def start_http(self, handler):
@@ -60,6 +68,73 @@ class HomeAssistantBackendTests(unittest.TestCase):
             names = set(archive.namelist())
         self.assertIn("custom_components/jarvis/manifest.json", names)
         self.assertIn("custom_components/jarvis/agent.py", names)
+        self.assertTrue(all("\\" not in name for name in names))
+
+    def test_component_state_does_not_create_the_config_tree(self) -> None:
+        config = self.root / "read-only-check"
+        server.HA_CONFIG_DIR = config
+        state = server.component_state()
+        self.assertFalse(state["installed"])
+        self.assertFalse(config.exists())
+
+    def test_component_install_removes_stale_files(self) -> None:
+        server.install_component()
+        stale = server.HA_CONFIG_DIR / "custom_components" / "jarvis" / "stale_module.py"
+        stale.write_text("old\n", encoding="utf-8")
+        manifest = server.HA_CONFIG_DIR / "custom_components" / "jarvis" / "manifest.json"
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+        data["version"] = "0.0.1"
+        manifest.write_text(json.dumps(data), encoding="utf-8")
+        server.install_component()
+        self.assertFalse(stale.exists())
+
+    def test_host_path_expands_tilde_against_host_home(self) -> None:
+        server.HOST_HOME = self.root / "real-home"
+        self.assertEqual(
+            server.expand_host_path("~/.config/homeassistant"),
+            self.root / "real-home" / ".config" / "homeassistant",
+        )
+        self.assertEqual(
+            server.expand_host_path(str(self.root / "absolute")),
+            self.root / "absolute",
+        )
+
+    def test_ws_accept_matches_rfc_example(self) -> None:
+        self.assertEqual(
+            server.ws_accept("dGhlIHNhbXBsZSBub25jZQ=="),
+            "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+        )
+
+    def test_cross_origin_redirect_drops_authorization(self) -> None:
+        from urllib.request import Request
+        handler = server._SafeRedirectHandler()
+        request = Request("http://127.0.0.1/api", headers={"Authorization": "Bearer secret"})
+        redirected = handler.redirect_request(request, None, 302, "", None, "http://example.invalid/api")
+        self.assertIsNotNone(redirected)
+        self.assertEqual(redirected.get_header("Authorization"), None)
+
+    def test_status_payload_handles_ha_being_down(self) -> None:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.bind(("127.0.0.1", 0))
+            closed_port = probe.getsockname()[1]
+        server.HA_URL = f"http://127.0.0.1:{closed_port}"
+        server.VOICE_URL = f"http://127.0.0.1:{closed_port}"
+        server.write_token("ha", "fake-token")
+        payload = server.status_payload()
+        self.assertFalse(payload["ha"]["connected"])
+        self.assertIn("could not reach", payload["ha"]["error"])
+        self.assertIn("error", payload["integration"])
+        self.assertEqual(payload["config"]["proxy_mount"], "homeassistant")
+
+    def test_settings_uses_in_page_dialogs(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "ui" / "settings.js").read_text(encoding="utf-8")
+        page = (root / "ui" / "settings.html").read_text(encoding="utf-8")
+        self.assertNotIn("confirm(", script)
+        self.assertNotIn("prompt(", script)
+        self.assertIn("askConfirm", script)
+        self.assertIn("showText", script)
+        self.assertIn('id="dialog"', page)
 
     def test_saved_tokens_are_private_and_preferred(self) -> None:
         server.write_token("ha", "secret-value")

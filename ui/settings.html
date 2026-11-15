@@ -54,6 +54,16 @@
       <div class="row"><button class="ghost" id="copyProxy" type="button">Copy mount</button><span class="muted" id="proxyStatus"></span></div>
     </section>
   </main>
+  <div class="dialog-backdrop" id="dialogBackdrop" hidden></div>
+  <section class="dialog" id="dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle">
+    <h2 id="dialogTitle">Confirm</h2>
+    <p class="dialog-text" id="dialogText"></p>
+    <textarea class="dialog-textarea" id="dialogInput" rows="5" hidden readonly></textarea>
+    <div class="dialog-actions">
+      <button class="ghost" id="dialogCancel" type="button">Cancel</button>
+      <button class="primary" id="dialogOk" type="button">Confirm</button>
+    </div>
+  </section>
   <div class="toast" id="toast" hidden></div>
   <script src="settings.js"></script>
 </body>

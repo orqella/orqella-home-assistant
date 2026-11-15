@@ -10,6 +10,8 @@ agent and Whisper STT engine.
 from __future__ import annotations
 
 import base64
+import copy
+import hashlib
 import hmac
 import io
 import json
@@ -19,6 +21,7 @@ import socket
 import ssl
 import struct
 import subprocess
+import tempfile
 import threading
 import time
 import zipfile
@@ -26,7 +29,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 TOKEN = os.environ.get("ORQELLA_MODULE_TOKEN", "")
 try:
@@ -36,11 +39,36 @@ except json.JSONDecodeError:
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = MODULE_ROOT / "data"
 INTEGRATION_SOURCE = MODULE_ROOT / "integration" / "jarvis"
+HOST_HOME = Path(os.environ.get("ORQELLA_HOST_HOME") or Path.home()).expanduser()
+
+
+def sanitized_env() -> dict[str, str]:
+    env = dict(os.environ)
+    env.pop("ORQELLA_MODULE_TOKEN", None)
+    env.pop("ORQELLA_MODULE_CONFIG", None)
+    env["HOME"] = str(HOST_HOME)
+    return env
+
+
+def expand_host_path(value: str) -> Path:
+    """Resolve a user-supplied path against the real host home.
+
+    Sidecars run with HOME pointing at <module>/data/home. A leading ``~`` must
+    still mean the home directory of the logged-in user.
+    """
+    raw = str(value or "").strip()
+    if raw == "~":
+        return HOST_HOME
+    if raw.startswith("~/"):
+        return HOST_HOME / raw[2:]
+    return Path(raw).expanduser()
+
+
 HA_URL = str(CONFIG.get("ha_url") or "http://127.0.0.1:8123").rstrip("/")
 VOICE_URL = str(CONFIG.get("voice_assistant_url") or "http://127.0.0.1:8790").rstrip("/")
 SHARED_VOICE_TOKEN = MODULE_ROOT.parent.parent / "voice-engine.token"
 HA_CONFIG_DIR = (
-    Path(os.path.expanduser(str(CONFIG.get("ha_config_dir"))))
+    expand_host_path(str(CONFIG.get("ha_config_dir")))
     if str(CONFIG.get("ha_config_dir") or "").strip()
     else None
 )
@@ -52,11 +80,15 @@ TOKEN_TIMEOUT = 8
 HTTP_TIMEOUT = 10
 WS_TIMEOUT = 15
 INTEGRATION_TTL = 20
+STATUS_TTL = 4
 MAX_JSON = 2 * 1024 * 1024
 MAX_BUNDLE = 4 * 1024 * 1024
+WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 INTEGRATION_CACHE: dict[str, object] = {"at": 0.0, "value": None}
 INTEGRATION_LOCK = threading.Lock()
+STATUS_CACHE: dict[str, object] = {"at": 0.0, "value": None}
+STATUS_LOCK = threading.Lock()
 
 
 def now() -> float:
@@ -69,6 +101,14 @@ def token_path(kind: str) -> Path:
 
 def host_path(kind: str) -> Path:
     return DATA_DIR / f"{kind}.host"
+
+
+def _ensure_data_dir() -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        DATA_DIR.chmod(0o700)
+    except OSError:
+        pass
 
 
 def write_host(kind: str, value: str) -> None:
@@ -94,7 +134,7 @@ def credential_host(kind: str) -> str:
 
 
 def write_token(kind: str, value: str) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_data_dir()
     path = token_path(kind)
     if not value:
         path.unlink(missing_ok=True)
@@ -146,6 +186,7 @@ def token_for(kind: str) -> tuple[str, str]:
                 text=True,
                 timeout=TOKEN_TIMEOUT,
                 errors="replace",
+                env=sanitized_env(),
             )
             if proc.returncode == 0:
                 for line in proc.stdout.splitlines():
@@ -161,6 +202,29 @@ def token_for(kind: str) -> tuple[str, str]:
     return "", ""
 
 
+class _SafeRedirectHandler(HTTPRedirectHandler):
+    """Never forward an Authorization header to a different origin."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is None:
+            return None
+        old = urlparse(req.full_url)
+        new = urlparse(redirected.full_url)
+        if (old.scheme, old.netloc) != (new.scheme, new.netloc):
+            materialized = redirected.header_items()
+            for key, _value in list(materialized):
+                if key.lower() == "authorization":
+                    try:
+                        redirected.remove_header(key)
+                    except (KeyError, AttributeError):
+                        pass
+        return redirected
+
+
+HTTP_OPENER = build_opener(_SafeRedirectHandler)
+
+
 def request_json(url: str, token: str = "", method: str = "GET", body: dict | None = None) -> tuple[int, object]:
     data = json.dumps(body).encode() if body is not None else None
     headers = {"Accept": "application/json"}
@@ -170,7 +234,7 @@ def request_json(url: str, token: str = "", method: str = "GET", body: dict | No
         headers["Authorization"] = f"Bearer {token}"
     request = Request(url, data=data, method=method, headers=headers)
     try:
-        with urlopen(request, timeout=HTTP_TIMEOUT) as response:
+        with HTTP_OPENER.open(request, timeout=HTTP_TIMEOUT) as response:
             raw = response.read()
             try:
                 return response.status, json.loads(raw) if raw else {}
@@ -239,6 +303,11 @@ def voice_status() -> dict:
     return result
 
 
+def ws_accept(key: str) -> str:
+    digest = hashlib.sha1((key + WS_GUID).encode("ascii")).digest()
+    return base64.b64encode(digest).decode("ascii")
+
+
 class HAWebSocket:
     """Minimal Home Assistant WebSocket API client using only the stdlib."""
 
@@ -272,8 +341,10 @@ class HAWebSocket:
         key = base64.b64encode(os.urandom(16)).decode()
         path = f"{self.base_path}/api/websocket" if self.base_path else "/api/websocket"
         host_header = self.host
+        if ":" in self.host and not self.host.startswith("["):
+            host_header = f"[{self.host}]"
         if (self.secure and self.port != 443) or (not self.secure and self.port != 80):
-            host_header = f"{self.host}:{self.port}"
+            host_header = f"{host_header}:{self.port}"
         request = (
             f"GET {path} HTTP/1.1\r\n"
             f"Host: {host_header}\r\n"
@@ -285,8 +356,18 @@ class HAWebSocket:
         )
         self.socket.sendall(request.encode())
         head = self._read_until(b"\r\n\r\n")
-        if b" 101 " not in head.split(b"\r\n", 1)[0]:
+        head_lines = head.split(b"\r\n")
+        if b" 101 " not in (head_lines[0] if head_lines else b""):
             raise RuntimeError("Home Assistant WebSocket upgrade failed")
+        expected_accept = ws_accept(key)
+        supplied_accept = ""
+        for line in head_lines[1:]:
+            name, _sep, value = line.partition(b":")
+            if name.strip().lower() == b"sec-websocket-accept":
+                supplied_accept = value.strip().decode("ascii", "replace")
+                break
+        if not supplied_accept or not hmac.compare_digest(supplied_accept, expected_accept):
+            raise RuntimeError("Home Assistant WebSocket handshake was not verified")
         first = self._recv_json()
         if first.get("type") != "auth_required":
             raise RuntimeError("unexpected Home Assistant WebSocket handshake")
@@ -430,8 +511,13 @@ def component_state() -> dict:
     writable = False
     try:
         parent = destination.parent
-        parent.mkdir(parents=True, exist_ok=True)
-        writable = os.access(destination if destination.exists() else parent, os.W_OK)
+        # Status must be a read-only operation. Check the first existing
+        # ancestor without creating directories in the HA config tree.
+        target = destination if destination.exists() else parent
+        probe = target
+        while not probe.exists() and probe != probe.parent:
+            probe = probe.parent
+        writable = probe.is_dir() and os.access(target if target.exists() else probe, os.W_OK)
     except OSError:
         writable = False
     return {
@@ -461,13 +547,31 @@ def install_component() -> dict:
         )
     destination = HA_CONFIG_DIR / "custom_components" / "jarvis"
     destination.parent.mkdir(parents=True, exist_ok=True)
+    wanted: set[str] = set()
     for source in INTEGRATION_SOURCE.rglob("*"):
         if source.is_dir() or "__pycache__" in source.parts or source.suffix == ".pyc":
             continue
         relative = source.relative_to(INTEGRATION_SOURCE)
+        wanted.add(relative.as_posix())
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(source.read_bytes())
+        payload = source.read_bytes()
+        fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(payload)
+            os.replace(temporary, target)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+    for existing in destination.rglob("*"):
+        if not existing.is_file():
+            continue
+        relative = existing.relative_to(destination)
+        if "__pycache__" in existing.parts or existing.suffix in {".pyc", ".pyo"}:
+            existing.unlink(missing_ok=True)
+            continue
+        if relative.as_posix() not in wanted:
+            existing.unlink(missing_ok=True)
     return component_state()
 
 
@@ -477,7 +581,10 @@ def integration_bundle() -> dict:
         for source in INTEGRATION_SOURCE.rglob("*"):
             if source.is_dir() or "__pycache__" in source.parts or source.suffix == ".pyc":
                 continue
-            archive.write(source, Path("custom_components/jarvis") / source.relative_to(INTEGRATION_SOURCE))
+            archive.write(
+                source,
+                (Path("custom_components/jarvis") / source.relative_to(INTEGRATION_SOURCE)).as_posix(),
+            )
         archive.writestr(
             "custom_components/jarvis/INSTALL.txt",
             "Copy the custom_components/jarvis directory into your Home Assistant "
@@ -530,7 +637,7 @@ def read_integration() -> dict:
                     if not result["entry"] and pipeline.get("stt_engine") == "stt.jarvis_whisper":
                         result["pipeline"] = pipeline
             result["ha_version"] = ws.ha_version
-    except RuntimeError as error:
+    except (RuntimeError, OSError) as error:
         result["error"] = str(error)
     return result
 
@@ -539,11 +646,22 @@ def integration_status(force: bool = False) -> dict:
     with INTEGRATION_LOCK:
         cached = INTEGRATION_CACHE["value"]
         if not force and cached and now() - float(INTEGRATION_CACHE["at"]) < INTEGRATION_TTL:
-            return cached  # type: ignore[return-value]
-    value = read_integration()
+            return copy.deepcopy(cached)  # type: ignore[arg-type]
+    try:
+        value = read_integration()
+    except (RuntimeError, OSError) as error:
+        value = {
+            "component": component_state(),
+            "entry": None,
+            "pipeline": None,
+            "preferred_pipeline": "",
+            "ha_version": "",
+            "token_source": "",
+            "error": str(error),
+        }
     with INTEGRATION_LOCK:
         INTEGRATION_CACHE["at"] = now()
-        INTEGRATION_CACHE["value"] = value
+        INTEGRATION_CACHE["value"] = copy.deepcopy(value)
     return value
 
 
@@ -634,7 +752,7 @@ def ensure_integration() -> dict:
                 pipeline = created.get("pipeline") if isinstance(created, dict) else created
                 if not isinstance(pipeline, dict):
                     raise RuntimeError("Home Assistant did not create an Assist pipeline")
-    except RuntimeError as error:
+    except (RuntimeError, OSError) as error:
         integration = integration_status(True)
         return {
             "ok": False,
@@ -661,9 +779,12 @@ def restart_ha() -> dict:
     token, _source = token_for("ha")
     if not token:
         raise RuntimeError("No Home Assistant token")
-    with HAWebSocket(HA_URL, token) as ws:
-        ws.command("homeassistant/restart")
-        return {"ok": True, "ha_version": ws.ha_version}
+    try:
+        with HAWebSocket(HA_URL, token) as ws:
+            ws.command("homeassistant/restart")
+            return {"ok": True, "ha_version": ws.ha_version}
+    except OSError as error:
+        raise RuntimeError(f"could not reach Home Assistant: {error}") from error
 
 
 def proxy_example() -> str:
@@ -678,8 +799,13 @@ def proxy_example() -> str:
     )
 
 
-def status_payload() -> dict:
-    return {
+def status_payload(force: bool = False) -> dict:
+    current = now()
+    with STATUS_LOCK:
+        cached = STATUS_CACHE["value"]
+        if not force and cached and current - float(STATUS_CACHE["at"]) < STATUS_TTL:
+            return copy.deepcopy(cached)  # type: ignore[arg-type]
+    value = {
         "ha": ha_status(),
         "voice": voice_status(),
         "integration": integration_status(),
@@ -692,6 +818,16 @@ def status_payload() -> dict:
         },
         "proxy_example": proxy_example(),
     }
+    with STATUS_LOCK:
+        STATUS_CACHE["at"] = current
+        STATUS_CACHE["value"] = copy.deepcopy(value)
+    return value
+
+
+def invalidate_status() -> None:
+    with STATUS_LOCK:
+        STATUS_CACHE["at"] = 0.0
+        STATUS_CACHE["value"] = None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -763,11 +899,16 @@ class Handler(BaseHTTPRequestHandler):
                 with INTEGRATION_LOCK:
                     INTEGRATION_CACHE["at"] = 0.0
                     INTEGRATION_CACHE["value"] = None
+                invalidate_status()
                 return self.send_json(200, {"ok": True, "kind": kind})
             if path == "/api/integration/ensure":
-                return self.send_json(200, ensure_integration())
+                result = ensure_integration()
+                invalidate_status()
+                return self.send_json(200, result)
             if path == "/api/integration/restart":
-                return self.send_json(200, restart_ha())
+                result = restart_ha()
+                invalidate_status()
+                return self.send_json(200, result)
             return self.send_json(404, {"error": "not found"})
         except ValueError as error:
             return self.send_json(400, {"error": str(error)})
@@ -778,7 +919,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _ensure_data_dir()
     port = int(os.environ["ORQELLA_MODULE_PORT"])
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 

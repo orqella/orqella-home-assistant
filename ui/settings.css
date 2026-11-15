@@ -188,6 +188,46 @@ code {
   box-shadow: var(--shadow);
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  z-index: 20;
+}
+.dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  z-index: 21;
+}
+.dialog h2 { margin: 0 0 8px; font-size: 16px; }
+.dialog-text { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+.dialog-textarea {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  color: var(--ink);
+  padding: 9px;
+  font: 11px/1.5 var(--font-mono);
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dialog-actions .ghost[hidden] { display: none; }
+
 @media (max-width: 620px) {
   .status-grid { grid-template-columns: 1fr; }
   .fields { grid-template-columns: 1fr; }

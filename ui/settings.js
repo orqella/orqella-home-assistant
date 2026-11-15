@@ -17,6 +17,50 @@
     toast.timer = setTimeout(() => { $("toast").hidden = true; }, 3200);
   }
 
+  let dialogResolve = null;
+
+  function closeDialog(value = null) {
+    if (!dialogResolve) return;
+    const resolve = dialogResolve;
+    dialogResolve = null;
+    $("dialog").hidden = true;
+    $("dialogBackdrop").hidden = true;
+    $("dialogInput").hidden = true;
+    $("dialogInput").value = "";
+    $("dialogCancel").hidden = false;
+    resolve(value);
+  }
+
+  function askConfirm(title, text, confirmLabel = "Confirm") {
+    return new Promise((resolve) => {
+      dialogResolve = resolve;
+      $("dialogTitle").textContent = title;
+      $("dialogText").textContent = text;
+      $("dialogInput").hidden = true;
+      $("dialogCancel").hidden = false;
+      $("dialogOk").textContent = confirmLabel;
+      $("dialogBackdrop").hidden = false;
+      $("dialog").hidden = false;
+      $("dialogCancel").focus();
+    });
+  }
+
+  function showText(title, text) {
+    return new Promise((resolve) => {
+      dialogResolve = resolve;
+      $("dialogTitle").textContent = title;
+      $("dialogText").textContent = "Select and copy the text below.";
+      $("dialogInput").value = text;
+      $("dialogInput").hidden = false;
+      $("dialogCancel").hidden = true;
+      $("dialogOk").textContent = "Close";
+      $("dialogBackdrop").hidden = false;
+      $("dialog").hidden = false;
+      $("dialogInput").focus();
+      $("dialogInput").select();
+    });
+  }
+
   function message(text, bad = false) {
     $("message").textContent = text || "";
     $("message").className = `message${bad ? " bad" : ""}`;
@@ -103,7 +147,12 @@
   }
 
   async function clearTokens() {
-    if (!confirm("Remove the saved Home Assistant and Voice Assistant tokens?")) return;
+    const ok = await askConfirm(
+      "Remove saved tokens",
+      "Remove the saved Home Assistant and Voice Assistant tokens?",
+      "Remove",
+    );
+    if (!ok) return;
     try {
       await api("/api/token", "POST", { kind: "ha", token: "" });
       await api("/api/token", "POST", { kind: "voice", token: "" });
@@ -142,7 +191,12 @@
   }
 
   async function restart() {
-    if (!confirm("Restart Home Assistant now? The dashboard and automations will be briefly unavailable.")) return;
+    const ok = await askConfirm(
+      "Restart Home Assistant",
+      "Restart Home Assistant now? The dashboard and automations will be briefly unavailable.",
+      "Restart",
+    );
+    if (!ok) return;
     $("restart").disabled = true;
     try {
       await api("/api/integration/restart", "POST", {});
@@ -157,19 +211,28 @@
 
   async function download() {
     $("download").disabled = true;
+    // Open the popup synchronously so the sandbox's allow-popups permission is
+    // used before the async request loses the user gesture.
+    const popup = window.open("about:blank", "_blank");
     try {
       const bundle = await api("/api/integration/bundle");
       const raw = atob(bundle.base64 || "");
       const bytes = new Uint8Array(raw.length);
       for (let index = 0; index < raw.length; index += 1) bytes[index] = raw.charCodeAt(index);
       const url = URL.createObjectURL(new Blob([bytes], { type: bundle.content_type || "application/zip" }));
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = bundle.filename || "home-assistant-jarvis-component.zip";
-      anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast("Component bundle downloaded");
+      if (popup) {
+        popup.location.href = url;
+        toast("Download opened in a new tab");
+      } else {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = bundle.filename || "home-assistant-jarvis-component.zip";
+        anchor.click();
+        toast("Component bundle download started");
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (error) {
+      try { popup?.close(); } catch (_) {}
       toast(String(error.message || error), true);
     } finally {
       $("download").disabled = false;
@@ -182,7 +245,7 @@
       await navigator.clipboard.writeText(text);
       toast("Proxy mount copied");
     } catch (_) {
-      prompt("Copy this proxy mount:", text);
+      await showText("Proxy mount", text);
     }
   }
 
@@ -194,6 +257,15 @@
     $("restart").onclick = restart;
     $("download").onclick = download;
     $("copyProxy").onclick = copyProxy;
+    $("dialogCancel").onclick = () => closeDialog(false);
+    $("dialogOk").onclick = () => closeDialog($("dialogInput").hidden ? true : null);
+    $("dialogBackdrop").onclick = () => closeDialog(false);
+    document.addEventListener("keydown", (event) => {
+      if (!$("dialog").hidden && event.key === "Escape") {
+        event.preventDefault();
+        closeDialog(false);
+      }
+    });
   }
 
   window.orqella.ready(() => {

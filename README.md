@@ -85,3 +85,9 @@ tokens, proxy snippet, and integration button.
   the status API or logged.
 - The HA custom component talks to Voice Assistant only; it does not proxy
   Home Assistant itself.
+- Module iframes cannot use native browser confirm/prompt dialogs, so the
+  settings page uses in-page dialogs and opens the component download in a
+  popup. Use HTTPS for a remote Home Assistant; tokens over plain HTTP are not
+  acceptable outside loopback.
+- A `~` in the HA config directory is resolved against the real user home via
+  `ORQELLA_HOST_HOME`, not the sidecar's module home.
