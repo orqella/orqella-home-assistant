@@ -1,13 +1,11 @@
 schema = 1
 id = "home-assistant"
 name = "Home Assistant"
-version = "0.1.6"
+version = "0.1.7"
 api_version = "1"
 description = "Open your Home Assistant dashboard and connect Voice Assistant to Assist."
 entry = "ui/index.html"
-overview = "ui/overview.html"
 settings = "ui/settings.html"
-overview_default = true
 page_default = true
 icon = "ui/icon.svg"
 node_scope = "node"
@@ -20,8 +18,6 @@ reason = "Adds the Voice Assistant conversation agent and Whisper STT pipeline."
 
 [ui]
 surface = "page"
-overview_width = 3
-overview_height = 2
 
 [backend]
 kind = "sidecar"
