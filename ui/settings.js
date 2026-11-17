@@ -268,6 +268,24 @@
     });
   }
 
+  let heightTimer = null;
+  function reportHeight() {
+    clearTimeout(heightTimer);
+    heightTimer = setTimeout(() => {
+      const height = Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+      parent.postMessage({ type: "orqella:frame-height", height }, "*");
+    }, 30);
+  }
+
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(reportHeight);
+    observer.observe(document.body);
+    observer.observe(document.documentElement);
+  }
+  window.addEventListener("load", reportHeight);
+  window.addEventListener("resize", reportHeight);
+  requestAnimationFrame(reportHeight);
+
   window.orqella.ready(() => {
     bind();
     load();
