@@ -1,5 +1,7 @@
 # Home Assistant
 
+![Home Assistant connection, tokens, Assist integration, and dashboard proxy settings](docs/screenshot.png)
+
 Opens your Home Assistant dashboard as an Orqella app surface and optionally integrates the
 Voice Assistant module as a Home Assistant Assist conversation agent and Whisper
 STT engine.
