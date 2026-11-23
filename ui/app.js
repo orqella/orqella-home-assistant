@@ -4,6 +4,7 @@
   let context = { node: { id: "local", name: "local" }, config: {} };
   let opened = false;
   let busy = false;
+  let lastStatus = null;
 
   const backend = (path, method = "GET", body) =>
     window.orqella.call("backend.request", {
@@ -12,11 +13,12 @@
       ...(body !== undefined ? { body } : {}),
     });
 
-  const showError = (title, detail, setup) => {
+  const showError = (title, detail, setup, canConfigure = false) => {
     $("title").textContent = title;
     $("title").className = "error";
     $("detail").textContent = detail;
     $("actions").hidden = false;
+    $("configure").hidden = !canConfigure;
     $("setup").textContent = setup || "";
     $("setup").hidden = !setup;
   };
@@ -34,6 +36,7 @@
     const node = context.node?.id || "local";
     try {
       const status = await backend("/api/status");
+      lastStatus = status;
       const ha = status.ha || {};
       if (ha.version) {
         $("detail").textContent = `Home Assistant ${ha.version}${ha.location_name ? ` · ${ha.location_name}` : ""}`;
@@ -44,8 +47,9 @@
       } catch (error) {
         showError(
           "Home Assistant proxy is not configured",
-          `Add a ${mount} proxy mount for ${ha.url || "Home Assistant"}, then reopen this module.`,
+          `Save the dashboard proxy for ${ha.url || "Home Assistant"} once; Orqella will not ask again.`,
           status.proxy_example || "",
+          true,
         );
         return;
       }
@@ -54,6 +58,7 @@
           "Home Assistant is not reachable",
           proxy?.error || `No response from ${ha.url || "Home Assistant"}.`,
           status.proxy_example || "",
+          true,
         );
         return;
       }
@@ -80,6 +85,51 @@
     }
   };
 
+  async function configureProxy() {
+    if (busy) return;
+    const base = lastStatus?.ha?.url || context.config?.ha_url || "";
+    if (!base) {
+      showError(
+        "Home Assistant URL is missing",
+        "Set the Home Assistant URL in Settings → Modules → Home Assistant, then try again.",
+        lastStatus?.proxy_example || "",
+        false,
+      );
+      return;
+    }
+    busy = true;
+    $("configure").disabled = true;
+    $("detail").textContent = "Saving the dashboard proxy…";
+    try {
+      await window.orqella.call("proxy.configure", {
+        mount: "homeassistant",
+        base_url: base,
+        title: "Home Assistant",
+        websocket: true,
+        frame: true,
+      });
+      busy = false;
+      await openDashboard();
+    } catch (error) {
+      busy = false;
+      const text = String(error?.message || error);
+      const hint = /permission/i.test(text)
+        ? "Approve 'node.proxy.manage:homeassistant' in Settings → Modules, then try again."
+        : /unknown module API method/i.test(text)
+          ? "This Orqella version does not support in-app proxy setup; use the manual mount below."
+          : "Open Settings → Modules → Home Assistant → Settings to save it there.";
+      showError(
+        "Could not configure the dashboard proxy",
+        `${text} ${hint}`,
+        lastStatus?.proxy_example || "",
+        true,
+      );
+    } finally {
+      $("configure").disabled = false;
+    }
+  }
+
+  $("configure").addEventListener("click", configureProxy);
   $("retry").addEventListener("click", openDashboard);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;

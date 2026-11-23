@@ -9,6 +9,10 @@ the generic proxy mount, app surface, and module backend/WebSocket bridge.
 - Do not return or log token values. Saved tokens belong in `data/*.token` with
   mode `0600`.
 - The dashboard is a proxied app surface, not an embedded iframe. It requires a
-  configured `[[proxy]]` mount.
+  configured `homeassistant` proxy mount.
+- Configure that mount from the module settings page with `proxy.configure`;
+  the module declares `node.proxy.manage:homeassistant` and the daemon derives
+  the host and applies the change without a restart. Keep the manual
+  `[[proxy]]` snippet only as a fallback for older daemons.
 - Keep the Voice Assistant integration compatible with the Voice Assistant module's
   `/api/conversation` and `/api/stt` endpoints.

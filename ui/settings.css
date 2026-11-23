@@ -108,6 +108,16 @@ h2 {
   gap: 10px;
   margin-bottom: 8px;
 }
+.config-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+#proxyStatus.ok { color: var(--mint); }
+#proxyStatus.warn { color: var(--amber); }
+#proxyStatus.bad { color: var(--red); }
+.proxy-manual { margin-top: 12px; }
 .hint {
   color: var(--muted);
   font-size: 11.5px;

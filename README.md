@@ -6,21 +6,19 @@ STT engine.
 
 ## Dashboard
 
-Home Assistant runs on its own origin through the Orqella proxy. Add a mount to `config.toml`:
+Home Assistant runs on its own isolated origin through the Orqella proxy.
+Open **Settings → Modules → Home Assistant** and save the **Dashboard proxy**
+URL. The module calls the permissioned `proxy.configure` host API, so there is
+no `config.toml` editing or daemon restart.
 
-```toml
-[[proxy]]
-id = "homeassistant"
-title = "Home Assistant"
-base_url = "http://127.0.0.1:8123"
-host = "homeassistant.orqella.localhost"
-websocket = true
-frame = true
-```
+For Home Assistant on another machine, enter that URL and make sure this
+Orqella daemon can reach it. The host is fixed to
+`homeassistant.orqella.localhost` and WebSockets are enabled automatically.
 
-For Home Assistant on another machine, change `base_url` to that host and make
-sure this Orqella daemon can reach it. `websocket = true` is required by the HA
-frontend.
+The module declares `node.proxy.manage:homeassistant` for this. It is a
+sensitive permission; if an update adds it, approve it in **Settings →
+Modules → Home Assistant → Review permissions** once. Older daemons without
+`proxy.configure` still show the manual mount snippet in the advanced section.
 
 The module page checks the mount and calls `app.open` with the configured
 `dashboard_path` (default `/lovelace/0`).
@@ -73,9 +71,9 @@ The integration uses the same API paths as the Voice Assistant engine:
 orqella module install https://github.com/orqella/orqella-home-assistant
 ```
 
-Then configure the proxy mount, restart the daemon, and open **Home Assistant**
-from the sidebar. **Settings → Modules**, select **Home Assistant**, to reach the connection,
-tokens, proxy snippet, and integration button.
+Open **Home Assistant** from the sidebar. **Settings → Modules**, select
+**Home Assistant**, to reach the connection, dashboard proxy, tokens, and
+integration controls.
 
 ## Security
 

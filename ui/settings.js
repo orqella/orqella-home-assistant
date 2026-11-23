@@ -8,6 +8,7 @@
       ...(body !== undefined ? { body } : {}),
     });
   let status = null;
+  let proxyState;
 
   function toast(message, bad = false) {
     $("toast").textContent = message;
@@ -108,12 +109,99 @@
     $("haToken").placeholder = ha.token_source === "settings" ? "A token is saved" : "Paste a Home Assistant long-lived token";
     $("voiceToken").placeholder = voice.token_source === "settings" ? "A token is saved" : "Usually blank";
     $("proxySnippet").textContent = next.proxy_example || "";
-    $("proxyStatus").textContent = `mount ${next.config?.proxy_mount || "homeassistant"}`;
+    $("proxyConfig").textContent = `mount ${next.config?.proxy_mount || "homeassistant"}`;
+    if (!$("proxyUrl").value) $("proxyUrl").value = ha.url || "";
+    renderProxy();
     $("restart").hidden = !(component.installed && !pipeline && !entry);
     if (integration.error) message(integration.error, true);
     else if (pipeline) message(`Connected through the ${pipeline.name || "Voice Assistant"} Assist pipeline.`);
     else if (entry) message("The integration entry exists; open Home Assistant to create or select an Assist pipeline.");
     else message("");
+  }
+
+  function proxyMount() {
+    return status?.config?.proxy_mount || "homeassistant";
+  }
+
+  function renderProxy() {
+    const node = $("proxyStatus");
+    node.className = "muted";
+    if (proxyState === undefined) {
+      node.textContent = "Checking proxy…";
+      return;
+    }
+    if (!proxyState) {
+      node.textContent = "Not configured";
+      node.className = "muted";
+      return;
+    }
+    if (proxyState.ok) {
+      node.textContent = `Ready${proxyState.url ? ` · ${proxyState.url}` : ""}`;
+      node.className = "ok";
+      return;
+    }
+    node.textContent = proxyState.url
+      ? `Configured, but ${proxyState.base_url || "the upstream"} is not reachable`
+      : "Configured, but the proxy host is missing";
+    node.className = "warn";
+  }
+
+  async function loadProxy(showError = false) {
+    try {
+      proxyState = await window.orqella.call("proxy.status", {
+        mount: proxyMount(),
+        node: "local",
+      });
+      if (!$("proxyUrl").value) {
+        $("proxyUrl").value = proxyState.base_url || status?.ha?.url || "";
+      }
+      renderProxy();
+    } catch (error) {
+      proxyState = null;
+      renderProxy();
+      if (showError) toast(String(error.message || error), true);
+    }
+  }
+
+  async function saveProxy() {
+    const base = $("proxyUrl").value.trim() || status?.ha?.url || "";
+    if (!base) {
+      toast("Enter the Home Assistant URL first", true);
+      $("proxyUrl").focus();
+      return;
+    }
+    $("saveProxy").disabled = true;
+    $("proxyStatus").textContent = "Saving proxy…";
+    try {
+      await window.orqella.call("proxy.configure", {
+        mount: proxyMount(),
+        base_url: base,
+        title: "Home Assistant",
+        websocket: true,
+        frame: true,
+      });
+      toast("Dashboard proxy saved");
+      await loadProxy();
+    } catch (error) {
+      const text = String(error?.message || error);
+      proxyState = null;
+      renderProxy();
+      if (/permission/i.test(text)) {
+        $("proxyStatus").textContent = "Permission required";
+        $("proxyStatus").className = "bad";
+        toast("Approve 'node.proxy.manage:homeassistant' in Settings → Modules, then save again", true);
+      } else if (/unknown module API method/i.test(text)) {
+        $("proxyStatus").textContent = "Update Orqella to manage this here";
+        $("proxyStatus").className = "warn";
+        toast("This Orqella version needs the manual mount below", true);
+      } else {
+        $("proxyStatus").textContent = "Could not save the proxy";
+        $("proxyStatus").className = "bad";
+        toast(text, true);
+      }
+    } finally {
+      $("saveProxy").disabled = false;
+    }
   }
 
   async function load() {
@@ -257,6 +345,8 @@
     $("restart").onclick = restart;
     $("download").onclick = download;
     $("copyProxy").onclick = copyProxy;
+    $("saveProxy").onclick = saveProxy;
+    $("checkProxy").onclick = () => loadProxy(true);
     $("dialogCancel").onclick = () => closeDialog(false);
     $("dialogOk").onclick = () => closeDialog($("dialogInput").hidden ? true : null);
     $("dialogBackdrop").onclick = () => closeDialog(false);
@@ -289,5 +379,6 @@
   window.orqella.ready(() => {
     bind();
     load();
+    loadProxy();
   });
 })();

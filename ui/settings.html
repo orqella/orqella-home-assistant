@@ -48,10 +48,23 @@
     </section>
 
     <section class="card">
-      <div class="section-head"><h2>Dashboard proxy</h2><span class="muted">core config</span></div>
-      <p class="hint">The module page opens Home Assistant as a separate app origin through the Orqella proxy. Add this mount to <code>config.toml</code> and restart the daemon. Change <code>base_url</code> for a remote Home Assistant.</p>
-      <pre class="snippet" id="proxySnippet">Loading…</pre>
-      <div class="row"><button class="ghost" id="copyProxy" type="button">Copy mount</button><span class="muted" id="proxyStatus"></span></div>
+      <div class="section-head"><h2>Dashboard proxy</h2><span class="muted">managed here</span></div>
+      <p class="hint">The module page opens Home Assistant on its own isolated app origin through Orqella's proxy. Save the proxy here; no config file editing or daemon restart is needed.</p>
+      <label class="field-label" for="proxyUrl">
+        Home Assistant URL for the dashboard
+        <input class="field" id="proxyUrl" type="url" placeholder="http://127.0.0.1:8123" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="config-help">Usually the same as the module's <code>ha_url</code>. It must be reachable from this machine.</p>
+      <div class="row wrap">
+        <button class="primary" id="saveProxy" type="button">Save dashboard proxy</button>
+        <button class="ghost" id="checkProxy" type="button">Check proxy</button>
+        <span class="muted" id="proxyStatus">Checking proxy…</span>
+      </div>
+      <details class="proxy-manual">
+        <summary class="small muted">Advanced: manual config.toml mount</summary>
+        <pre class="snippet" id="proxySnippet">Loading…</pre>
+        <div class="row"><button class="ghost" id="copyProxy" type="button">Copy mount</button><span class="muted" id="proxyConfig"></span></div>
+      </details>
     </section>
   </main>
   <div class="dialog-backdrop" id="dialogBackdrop" hidden></div>

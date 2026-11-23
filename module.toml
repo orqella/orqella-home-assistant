@@ -1,7 +1,7 @@
 schema = 1
 id = "home-assistant"
 name = "Home Assistant"
-version = "0.1.7"
+version = "0.2.0"
 api_version = "1"
 description = "Open your Home Assistant dashboard and connect Voice Assistant to Assist."
 entry = "ui/index.html"
@@ -9,7 +9,7 @@ settings = "ui/settings.html"
 page_default = true
 icon = "ui/icon.svg"
 node_scope = "node"
-permissions = ["backend", "node.proxy:homeassistant", "app.open"]
+permissions = ["backend", "node.proxy:homeassistant", "node.proxy.manage:homeassistant", "app.open"]
 
 [[dependencies]]
 id = "voice-assistant"
