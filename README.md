@@ -1,4 +1,18 @@
-# Home Assistant
+<p align="center">
+  <a href="https://orqella.io">
+    <img src="logo.png" alt="Orqella" width="96">
+  </a>
+</p>
+
+<h1 align="center">Home Assistant</h1>
+
+<p align="center">
+  <a href="https://orqella.io">Website</a> ·
+  <a href="https://github.com/orqella/orqella#install">Quick start</a> ·
+  <a href="https://github.com/orqella/orqella#modules">Modules</a> ·
+  <a href="https://github.com/orqella/orqella#desktop-client">Desktop client</a> ·
+  <a href="https://orqella.io/docs/">Documentation</a>
+</p>
 
 ![Home Assistant connection, tokens, Assist integration, and dashboard proxy settings](docs/screenshot.png)
 
